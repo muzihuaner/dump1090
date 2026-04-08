@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  dump1090:
+    build: .
+    container_name: dump1090
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "30003:30003"
+    devices:
+      - /dev/bus/usb
+    privileged: true
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data:/app/data

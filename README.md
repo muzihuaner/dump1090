@@ -68,6 +68,49 @@ sudo cp -r public_html /usr/share/dump1090/
 
 ------
 
+### Docker 部署
+
+#### 解决内核驱动冲突 
+Linux 内核通常会默认将 RTL2832U 识别为电视调谐卡（dvb_usb_rtl2832u），这会占用设备导致 SDR 软件无法访问。  
+
+我们需要将这些模块加入黑名单：  
+
+创建黑名单文件：  
+
+```
+sudo nano /etc/modprobe.d/blacklist-rtlsdr.conf
+```
+在文件中粘贴以下内容：
+```
+blacklist dvb_usb_rtl2832u
+blacklist dvb_usb_v2
+blacklist rtl2832
+```
+保存退出，然后拔掉并重新插上你的 RTL-SDR 硬件。
+
+#### 1. 构建 Docker 镜像
+
+```
+docker build -t dump1090 .
+```
+
+#### 2. 启动 Docker 容器
+
+```
+docker run -d \
+  --name dump1090 \
+  --restart unless-stopped \
+  --device /dev/bus/usb \
+  --privileged \
+  -p 8080:8080 \
+  -p 30003:30003 \
+  dump1090:latest
+```
+访问服务
+Web 地图界面: http://ip:8080
+原始数据流: tcp://ip:30003
+
+
 ## 常用运行命令汇总
 
 | **场景**                     | **命令**                                      |
