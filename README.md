@@ -1,309 +1,91 @@
-Dump1090 README
-===
+## Dump1090 项目
 
-Dump 1090 is a Mode S decoder specifically designed for RTLSDR devices.
+Dump1090 是一款专为 RTLSDR 接收机设计的 Mode S 解码器。
 
-The main features are:
+### 主要特性：
 
-* Robust decoding of weak messages, with Dump1090 many users observed
-  improved range compared to other popular decoders.
-* Network support: TCP30003 stream (MSG5...), Raw packets, HTTP.
-* Embedded HTTP server that displays the currently detected aircrafts on
-  Google Map.
-* Single bit errors correction using the 24 bit CRC.
-* Ability to decode DF11, DF17 messages.
-* Ability to decode DF formats like DF0, DF4, DF5, DF16, DF20 and DF21
-  where the checksum is xored with the ICAO address by brute forcing the
-  checksum field using recently seen ICAO addresses.
-* Decode raw IQ samples from file (using --ifile command line switch).
-* Interactive command-line-interface mode where aircrafts currently detected
-  are shown as a list refreshing as more data arrives.
-* CPR coordinates decoding and track calculation from velocity.
-* Surface position decoding for aircraft on the ground (taxiing, etc.).
-* TCP server streaming and receiving raw data to/from connected clients
-  (using --net).
+- **强力解码：** 能够解码微弱信号，相比其他解码器具有更好的接收范围。
+- **网络支持：** 支持 TCP30003 流（MSG5...）、原始数据包（Raw）以及 HTTP。
+- **内置 Web 服务：** 可直接在谷歌地图（Google Maps）上显示检测到的飞机。
+- **单比特纠错：** 使用 24 位 CRC 进行错误修复。
+- **支持多种协议：** 可解码 DF11、DF17 消息，并能通过暴力破解校验场来解码 DF0、DF4 等格式。
+- **交互模式：** 实时刷新的命令行列表界面。
+- **坐标计算：** 支持 CPR 坐标解码和基于速度的轨迹计算。
+- **地面位置解码：** 支持对跑道滑行或停靠飞机的定位。
 
-While from time to time I still add / fix stuff in my fork, I target
-minimalism of the implementation. However there is a
-[much more feature complete fork](https://github.com/MalcolmRobb/dump1090)
-available, developed by MalcolmRobb.
+------
 
-Installation
----
+## 编译与安装指南
 
-Type "make".
+Dump1090 是一个轻量级的 C 语言程序，安装过程非常简单，但首先需要确保你的 Linux 系统安装了必要的依赖库。
 
-Normal usage
----
+### 1. 安装依赖
 
-To capture traffic directly from your RTL device and show the captured traffic
-on standard output, just run the program without options at all:
+在编译之前，你需要安装 `librtlsdr` 库（用于驱动接收棒）和 `pkg-config`。
 
-    ./dump1090
+**在 Ubuntu / Debian / Raspberry Pi OS 上：**
 
-To just output hexadecimal messages:
+```
+sudo apt update
+sudo apt install git build-essential librtlsdr-dev pkg-config
+```
 
-    ./dump1090 --raw
+### 2. 获取源码与编译
 
-To run the program in interactive mode:
+```
+# 克隆仓库（或者进入你已下载的目录）
+git clone https://github.com/muzihuaner/dump1090.git
+cd dump1090
 
-    ./dump1090 --interactive
+# 执行编译
+make
+```
 
-To run the program in interactive mode, with networking support, and connect
-with your browser to http://localhost:8080 to see live traffic:
+编译完成后，你会在当前目录下看到一个名为 `dump1090` 的可执行文件。
 
-    ./dump1090 --interactive --net
+### 3. 如何在 Linux 上“安装”
 
-In interactive mode it is possible to have a less information dense but more
-"arcade style" output, where the screen is refreshed every second displaying
-all the recently seen aircrafts with some additional information such as
-altitude and flight number, extracted from the received Mode S packets.
+Dump1090 默认没有提供 `make install` 命令将文件拷贝到系统目录。你可以通过以下步骤手动完成安装，以便在任何地方通过命令行调用它。
 
-Using files as source of data
----
+#### 方案 A：手动安装到系统路径（推荐）
 
-To decode data from file, use:
+```
+# 将二进制文件移动到 /usr/local/bin
+sudo cp dump1090 /usr/local/bin/
 
-    ./dump1090 --ifile /path/to/binfile
+# (可选) 如果你想运行 Web 服务，需要保留网页文件
+sudo mkdir -p /usr/share/dump1090
+sudo cp -r public_html /usr/share/dump1090/
+```
 
-The binary file should be created using `rtl_sdr` like this (or with any other
-program that is able to output 8-bit unsigned IQ samples at 2Mhz sample rate).
+#### 方案 B：直接运行
 
-    rtl_sdr -f 1090000000 -s 2000000 -g 50 output.bin
+如果你不想移动文件，可以直接在源码目录下执行：
 
-In the example `rtl_sdr` a gain of 50 is used, simply you should use the highest
-gain available for your tuner. This is not needed when calling Dump1090 itself
-as it is able to select the highest gain supported automatically.
+```
+./dump1090 --interactive --net
+```
 
-It is possible to feed the program with data via standard input using
-the --ifile option with "-" as argument.
+------
 
-Additional options
----
+## 常用运行命令汇总
 
-Dump1090 can be called with other command line options to set a different
-gain, frequency, and so forth. For a list of options use:
+| **场景**                     | **命令**                                      |
+| ---------------------------- | --------------------------------------------- |
+| **标准模式**                 | `./dump1090`                                  |
+| **交互式列表（推荐）**       | `./dump1090 --interactive`                    |
+| **开启 Web 地图服务**        | `./dump1090 --interactive --net`              |
+| **开启网络并启用“激进模式”** | `./dump1090 --interactive --net --aggressive` |
 
-    ./dump1090 --help
+> **注意：** 开启 `--net` 后，你可以打开浏览器访问 `http://localhost:8080` 查看到动态地图。
 
-Everything is not documented here should be obvious, and for most users calling
-it without arguments at all is the best thing to do.
+------
 
-Reliability
----
+## 关于天线的小提示
 
-By default Dump1090 tries to fix bit errors using the CRC checksum.
-The program uses a precomputed syndrome table to quickly identify and correct
-up to two bit errors in received messages.
+Mode S 信号运行在 **1090 MHz**。
 
-This is indeed able to fix errors and works reliably in my experience,
-however if you are interested in very reliable data I suggest to use
-the --no-fix command line switch in order to disable error fixing.
+- 如果你使用自带的小天线，建议将其拉伸至约 **6.9 厘米**（1/4 波长）以获得最佳共振。
+- 尽量将天线放置在窗边或户外开阔地带，以获得超过 200 公里的接收距离。
 
-Performances and sensibility of detection
----
-
-In my limited experience Dump1090 was able to decode a big number of messages
-even in conditions where I encountered problems using other programs, however
-no formal test was performed so I can't really claim that this program is
-better or worse compared to other similar programs.
-
-If you can capture traffic that Dump1090 is not able to decode properly, drop
-me an email with a download link. I may try to improve the detection during
-my free time (this is just an hobby project).
-
-Surface position decoding
----
-
-Dump1090 can decode surface position messages (Type Code 5-8), which are
-transmitted by aircraft while on the ground (taxiing, waiting at gates, etc.).
-These messages include the aircraft's position, ground speed, and ground track.
-
-Surface positions use a different encoding than airborne positions: the CPR
-(Compact Position Reporting) format covers only 90 degrees instead of 360,
-and requires a reference position within 45 nautical miles for unambiguous
-decoding.
-
-Instead of requiring you to configure your receiver's location, Dump1090
-automatically computes a reference position by averaging all successfully
-decoded airborne positions. This works because if you can receive surface
-traffic from an airport, you almost certainly receive airborne traffic too.
-The averaged position of overflying aircraft provides a reference that is
-close enough (well within the 45 NM requirement) to decode surface positions.
-
-Note: Surface positions will only be displayed once at least one airborne
-position has been successfully decoded to establish the reference. Aircraft
-on the ground will show with altitude 0 in the interactive display.
-
-Network server features
----
-
-By enabling the networking support with --net Dump1090 starts listening
-for clients connections on port 30002 and 30001 (you can change both the
-ports if you want, see --help output).
-
-Port 30002
----
-
-Connected clients are served with data ASAP as they arrive from the device
-(or from file if --ifile is used) in the raw format similar to the following:
-
-    *8D451E8B99019699C00B0A81F36E;
-
-Every entry is separated by a simple newline (LF character, hex 0x0A).
-
-Port 30001
----
-
-Port 30001 is the raw input port, and can be used to feed Dump1090 with
-data in the same format as specified above, with hex messages starting with
-a `*` and ending with a `;` character.
-
-So for instance if there is another remote Dump1090 instance collecting data
-it is possible to sum the output to a local Dump1090 instance doing something
-like this:
-
-    nc remote-dump1090.example.net 30002 | nc localhost 30001
-
-It is important to note that what is received via port 30001 is also
-broadcasted to clients listening to port 30002.
-
-In general everything received from port 30001 is handled exactly like the
-normal traffic from RTL devices or from file when --ifile is used.
-
-It is possible to use Dump1090 just as an hub using --ifile with /dev/zero
-as argument as in the following example:
-
-    ./dump1090 --net-only
-
-Or alternatively to see what's happening on the screen:
-
-    ./dump1090 --net-only --interactive
-
-Then you can feed it from different data sources from the internet.
-
-Port 30003
----
-
-Connected clients are served with messages in SBS1 (BaseStation) format,
-similar to:
-
-    MSG,4,,,738065,,,,,,,,420,179,,,0,,0,0,0,0
-    MSG,3,,,738065,,,,,,,35000,,,34.81609,34.07810,,,0,0,0,0
-
-This can be used to feed data to various sharing sites without the need to use another decoder.
-
-Antenna
----
-
-Mode S messages are transmitted in the 1090 Mhz frequency. If you have a decent
-antenna you'll be able to pick up signals from aircrafts pretty far from your
-position, especially if you are outdoor and in a position with a good sky view.
-
-You can easily build a very cheap antenna following the instructions at:
-
-    http://antirez.com/news/46
-
-With this trivial antenna I was able to pick up signals of aircrafts 200+ Km
-away from me.
-
-If you are interested in a more serious antenna check the following
-resources:
-
-* http://gnuradio.org/data/grcon11/06-foster-adsb.pdf
-* http://www.lll.lu/~edward/edward/adsb/antenna/ADSBantenna.html
-* http://modesbeast.com/pix/adsb-ant-drawing.gif
-
-Aggressive mode
----
-
-With --aggressive it is possible to activate the *aggressive mode* that is a
-modified version of the Mode S packet detection and decoding.
-The aggressive mode uses more CPU usually (especially if there are many planes
-sending DF17 packets), but can detect a few more messages.
-
-The algorithm in aggressive mode is modified in the following ways:
-
-* Up to two demodulation errors are tolerated (adjacent entries in the magnitude
-  vector with the same height). Normally only messages without errors are
-  checked.
-* It tries to fix DF17 messages trying every two bits combination.
-
-The use of aggressive mode is only advised in places where there is low traffic
-in order to have a chance to capture some more messages.
-
-Debug mode
----
-
-The Debug mode is a visual help to improve the detection algorithm or to
-understand why the program is not working for a given input.
-
-In this mode messages are displayed in an ASCII-art style graphical
-representation, where the individual magnitude bars sampled at 2Mhz are
-displayed.
-
-An index shows the sample number, where 0 is the sample where the first
-Mode S peak was found. Some additional background noise is also added
-before the first peak to provide some context.
-
-To enable debug mode and check what combinations of packets you can
-log, use `dump1090 --help` to obtain a list of available debug flags.
-
-Debug mode includes an optional javascript output that is used to visualize
-packets using a web browser, you can use the file debug.html under the
-'tools' directory to load the generated frames.js file.
-
-How this program works?
----
-
-The code is very documented and written in order to be easy to understand.
-For the diligent programmer with a Mode S specification on his hands it
-should be trivial to understand how it works.
-
-The algorithms I used were obtained basically looking at many messages
-as displayed using a throw-away SDL program, and trying to model the algorithm
-based on how the messages look graphically.
-
-How to test the program?
----
-
-If you have an RTLSDR device and you happen to be in an area where there
-are aircrafts flying over your head, just run the program and check for signals.
-
-However if you don't have an RTLSDR device, or if in your area the presence
-of aircrafts is very limited, you may want to try the sample file distributed
-with the Dump1090 distribution under the "testfiles" directory.
-
-Just run it like this:
-
-    ./dump1090 --ifile testfiles/modes1.bin
-
-What is --snip mode?
----
-
-It is just a simple filter that will get raw IQ 8 bit samples in input
-and will output a file missing all the parts of the file where I and Q
-are lower than the specified <level> for more than 32 samples.
-
-Use it like this:
-
-    cat big.bin | ./dump1090 --snip 25 > small.bin
-
-I used it in order to create a small test file to include inside this
-program source code distribution.
-
-Contributing
----
-
-Dump1090 was written during some free time during xmas 2012, it is an hobby
-project so I'll be able to address issues and improve it only during
-free time, however you are encouraged to send pull requests in order to
-improve the program. A good starting point can be the TODO list included in
-the source distribution.
-
-Credits
----
-
-Dump1090 was written by Salvatore Sanfilippo <antirez@gmail.com> and the
-other contributors that sent patches over the time (check the commits history
-for more information) and it is released under the BSD three clause license.
+希望这个指南能帮你顺利开启“上帝视角”观察空中交通！如果编译报错，请检查是否正确安装了 `librtlsdr-dev`。

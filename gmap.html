@@ -1,352 +1,259 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
-    <title>Dump1090</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
-        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>Dump1090 | 实时飞机雷达</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    backdropBlur: { xl: '24px' },
+                    colors: {
+                        panelDark: 'rgba(26, 26, 28, 0.6)',
+                        panelLight: 'rgba(255, 255, 255, 0.8)',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Base styles */
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100dvh;
+        :root {
+            --bg-color: #050505;
+            --text-color: #ffffff;
+            --border-color: rgba(255, 255, 255, 0.1);
         }
-
-        /* Map block */
-        .map {
-            width: 100%;
-            height: 100%;
+        .light-mode {
+            --bg-color: #f5f5f7;
+            --text-color: #1d1d1f;
+            --border-color: rgba(0, 0, 0, 0.1);
         }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s ease; }
+        .leaflet-container { background: var(--bg-color) !important; }
+        .plane-marker { display: flex; justify-content: center; align-items: center; border: none !important; background: none !important; }
+        
+        /* 隐藏 Leaflet 默认标志 */
+        .leaflet-control-attribution { display: none; }
 
-        /* Plane icon block */
-        .plane-icon {
-            padding: 0;
-            margin: 0;
-            cursor: pointer;
-            transition: transform 500ms linear;
-        }
-
-        .plane-icon__symbol {
-            font-size: 24px;
-            line-height: 32px;
-            width: 32px;
-            height: 32px;
-            text-align: center;
-            cursor: pointer;
-            color: #ffd700;
-            -webkit-text-stroke: 1px #000000;
-        }
-
-        .plane-icon__symbol--selected {
-            color: #ff6b6b;
-        }
-
-        /* Info panel block */
-        .info-panel {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 260px;
-            background-color: rgba(20, 20, 30, 0.6);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            font-family: system-ui, sans-serif;
-            z-index: 1000;
-            touch-action: none;
-            user-select: none;
-            color: #ffffff;
-        }
-
-        .info-panel__header {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: move;
-        }
-
-        .info-panel__title {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 600;
-            color: #ffffff;
-        }
-
-        .info-panel__content {
-            padding: 12px 16px;
-            margin: 0;
-        }
-
-        .info-panel__text {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.85);
-            margin: 0 0 8px 0;
-            line-height: 1.5;
-        }
-
-        .info-panel__text:last-child {
-            margin-bottom: 0;
-        }
-
-        .info-panel__flight {
-            font-size: 20px;
-            font-weight: 700;
-            color: #ffffff;
-            margin: 0 0 4px 0;
-        }
-
-        .info-panel__icao {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.5);
-            margin: 0 0 12px 0;
-            font-family: monospace;
-        }
-
-        .info-panel__grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .info-panel__item {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .info-panel__label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .info-panel__value {
-            font-size: 15px;
-            font-weight: 500;
-            color: #ffffff;
-        }
-
-        .info-panel__coords {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            font-size: 12px;
-            font-family: monospace;
-            color: rgba(255, 255, 255, 0.7);
+        @media (max-width: 640px) {
+            #info-panel { width: calc(100% - 2rem); right: 1rem; left: 1rem; top: auto; bottom: 1.5rem; }
         }
     </style>
 </head>
 
-<body>
-    <!-- Canvas for Leaflet map -->
-    <div id="canvas" class="map"></div>
+<body class="h-[100dvh] overflow-hidden font-sans">
+    <div id="canvas" class="w-full h-full"></div>
 
-    <!-- Floating info panel -->
-    <div class="info-panel" id="info-panel">
-        <div class="info-panel__header">
-            <h1 class="info-panel__title">Dump1090</h1>
+    <div id="info-panel" 
+        class="fixed top-6 right-6 w-80 bg-[var(--panel-bg)] backdrop-blur-xl border border-[var(--border-color)] rounded-3xl shadow-2xl z-[1000] select-none transition-all duration-500"
+        style="--panel-bg: rgba(26, 26, 28, 0.6);">
+        
+        <div class="info-panel__header p-5 border-b border-white/5 cursor-move flex justify-between items-center">
+            <div class="flex flex-col">
+                <span class="text-[10px] font-bold tracking-[0.2em] text-blue-500 uppercase">实时监控</span>
+                <h1 class="text-lg font-semibold tracking-tight">DUMP1090</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all">
+                    <i id="theme-icon" class="fa-solid fa-moon text-blue-400"></i>
+                </button>
+                <div class="px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                    <span id="aircraft-count" class="text-xs font-mono text-green-500">0</span>
+                    <span class="text-[10px] opacity-40 ml-1">架</span>
+                </div>
+            </div>
         </div>
-        <div class="info-panel__content">
-            <p id="generalInfo" class="info-panel__text"></p>
-            <p id="planeInfo" class="info-panel__text">Click on a plane for info</p>
+
+        <div id="info-content" class="p-5">
+            <div id="placeholder" class="py-12 text-center">
+                <div class="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/5">
+                    <i class="fa-solid fa-radar text-blue-500/50"></i>
+                </div>
+                <p class="text-sm opacity-40">请在地图上选择一架飞机</p>
+            </div>
+            
+            <div id="plane-info" class="hidden space-y-6">
+                <div>
+                    <div class="flex items-end justify-between mb-1">
+                        <a id="val-flight-link" href="#" target="_blank" 
+                           class="text-4xl font-bold tracking-tighter hover:text-blue-500 transition-all flex items-center gap-2 group">
+                           <span id="val-flight">---</span>
+                           <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                        </a>
+                        <span id="val-hex" class="text-xs font-mono opacity-30 mb-1">------</span>
+                    </div>
+                    <p class="text-[10px] opacity-40 uppercase tracking-widest">点击航班号查看 Flightradar24 详情</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-black/5 dark:bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <p class="text-[10px] uppercase opacity-40 mb-1 font-semibold">高度 Altitude</p>
+                        <p id="val-alt" class="text-lg font-medium font-mono">-- <span class="text-[10px] opacity-40">FT</span></p>
+                    </div>
+                    <div class="bg-black/5 dark:bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <p class="text-[10px] uppercase opacity-40 mb-1 font-semibold">速度 Speed</p>
+                        <p id="val-speed" class="text-lg font-medium font-mono">-- <span class="text-[10px] opacity-40">KT</span></p>
+                    </div>
+                    <div class="bg-black/5 dark:bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <p class="text-[10px] uppercase opacity-40 mb-1 font-semibold">航向 Track</p>
+                        <p id="val-track" class="text-lg font-medium font-mono">--°</p>
+                    </div>
+                    <div class="bg-black/5 dark:bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <p class="text-[10px] uppercase opacity-40 mb-1 font-semibold">垂直速率 VSI</p>
+                        <p id="val-vsi" class="text-lg font-medium font-mono">-- <span class="text-[10px] opacity-40">FPM</span></p>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-white/5 flex justify-between items-center text-[10px] font-mono opacity-30">
+                    <span id="val-lat">0.0000</span>
+                    <span>/</span>
+                    <span id="val-lon">0.0000</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js"></script>
+    
     <script type="module">
-        // Leaflet map instance and planes state
         let map = null;
+        let baseLayer = null;
+        let isDark = true;
         const planes = {};
-        let selectedPlane = null;
-        let copyingHex = null; // tracks which plane's info is being shown as "copied"
+        let selectedHex = null;
 
-        // Update panel general info
-        const updateGeneralInfo = () => {
-            const el = document.getElementById('generalInfo');
-            const planesCount = Object.keys(planes).length;
-            el.innerHTML = `
-                <span class="info-panel__value">${planesCount}</span>
-                <span class="info-panel__label">aircraft tracked</span>
-                `;
+        // 地图配置
+        const mapConfigs = {
+            dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
         };
 
-        // Update panel with new plane info
-        const updatePlaneInfo = (newPlane) => {
-            // Exit if new plane is not found, or if we're currently showing "Copied!" feedback
-            if (!newPlane || copyingHex === newPlane.hex) return;
-
-            // Update selected plane info
-            const el = document.getElementById('planeInfo');
-            el.innerHTML = `
-                <div class="info-panel__flight" data-copy="${newPlane.flight || '—'}" onclick="copyField(this)" title="Click to copy">${newPlane.flight || '—'}</div>
-                <div class="info-panel__icao" data-copy="${newPlane.hex}" onclick="copyField(this)" title="Click to copy">${newPlane.hex}</div>
-                <div class="info-panel__grid">
-                    <div class="info-panel__item">
-                        <span class="info-panel__label">Altitude</span>
-                        <span class="info-panel__value" data-copy="${newPlane.altitude ?? '—'}" onclick="copyField(this)" title="Click to copy">${newPlane.altitude ?? '—'} ft</span>
-                    </div>
-                    <div class="info-panel__item">
-                        <span class="info-panel__label">Speed</span>
-                        <span class="info-panel__value" data-copy="${newPlane.speed ?? '—'}" onclick="copyField(this)" title="Click to copy">${newPlane.speed ?? '—'} kts</span>
-                    </div>
-                    <div class="info-panel__item">
-                        <span class="info-panel__label">Heading</span>
-                        <span class="info-panel__value" data-copy="${newPlane.track ?? '—'}" onclick="copyField(this)" title="Click to copy">${newPlane.track ?? '—'}°</span>
-                    </div>
-                </div>
-                <div class="info-panel__coords" data-copy="${newPlane.lat.toFixed(4)}, ${newPlane.lon.toFixed(4)}" onclick="copyField(this)" title="Click to copy">${newPlane.lat.toFixed(4)}, ${newPlane.lon.toFixed(4)}</div>
-            `;
+        const initMap = () => {
+            map = L.map('canvas', { zoomControl: false, attributionControl: false }).setView([31.23, 121.47], 7);
+            baseLayer = L.tileLayer(mapConfigs.dark).addTo(map);
         };
 
-        // Copy text to clipboard when clicking on value elements
-        // Defines copyField function on the global window object to be accessible from inline onclick handlers
-        window.copyField = (el) => {
-            const text = el.dataset.copy;
-            if (!text || text === '—') return;
+        // 切换主题逻辑
+        const toggleTheme = () => {
+            isDark = !isDark;
+            const body = document.body;
+            const panel = document.getElementById('info-panel');
+            const icon = document.getElementById('theme-icon');
 
-            copyingHex = selectedPlane?.hex;
-
-            const finish = () => {
-                const original = el.innerHTML;
-                el.innerHTML = 'Copied!';
-                setTimeout(() => {
-                    el.innerHTML = original;
-                    copyingHex = null;
-                }, 1500);
-            };
-
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(finish);
+            if (isDark) {
+                body.classList.remove('light-mode');
+                panel.style.setProperty('--panel-bg', 'rgba(26, 26, 28, 0.6)');
+                icon.className = 'fa-solid fa-moon text-blue-400';
+                baseLayer.setUrl(mapConfigs.dark);
             } else {
-                // non-secure contexts (not on https or localhost)
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                finish();
+                body.classList.add('light-mode');
+                panel.style.setProperty('--panel-bg', 'rgba(255, 255, 255, 0.8)');
+                icon.className = 'fa-solid fa-sun text-orange-500';
+                baseLayer.setUrl(mapConfigs.light);
+            }
+            
+            // 重新渲染所有飞机图标以适应背景
+            Object.keys(planes).forEach(hex => {
+                const p = planes[hex];
+                p.marker.setIcon(createIcon(p.track, hex === selectedHex));
+            });
+        };
+
+        const updateUI = (plane) => {
+            if (!plane) return;
+            document.getElementById('placeholder').classList.add('hidden');
+            document.getElementById('plane-info').classList.remove('hidden');
+
+            const flight = plane.flight?.trim() || '未知航班';
+            document.getElementById('val-flight').innerText = flight;
+            document.getElementById('val-hex').innerText = plane.hex.toUpperCase();
+            document.getElementById('val-alt').innerText = plane.altitude || 0;
+            document.getElementById('val-speed').innerText = plane.speed || 0;
+            document.getElementById('val-track').innerText = (plane.track || 0) + '°';
+            document.getElementById('val-vsi').innerText = plane.vert_rate || 0;
+            document.getElementById('val-lat').innerText = plane.lat.toFixed(4);
+            document.getElementById('val-lon').innerText = plane.lon.toFixed(4);
+
+            const linkEl = document.getElementById('val-flight-link');
+            if (plane.flight) {
+                linkEl.href = `https://www.flightradar24.com/${flight}`;
+                linkEl.style.pointerEvents = 'auto';
+                linkEl.style.opacity = '1';
+            } else {
+                linkEl.href = '#';
+                linkEl.style.pointerEvents = 'none';
+                linkEl.style.opacity = '0.5';
             }
         };
 
-        // Create a custom marker with Font Awesome plane icon
-        const getIconForPlane = (plane) => {
-            const icon = L.divIcon({
-                html: `
-                    <div
-                        class="plane-icon__symbol${selectedPlane?.hex === plane.hex ? ' plane-icon__symbol--selected' : ''}"
-                        style="transform: rotate(${plane.track ?? 0}deg);"
-                    >
-                        <i class="fa-solid fa-plane-up"></i>
-                    </div>
-                    `,
-                className: 'plane-icon',
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
+        const createIcon = (track, isSelected) => {
+            // 根据主题和选中状态调整飞机颜色
+            let color = isDark ? '#fbbf24' : '#d97706'; // 未选中：黄色/深琥珀
+            if (isSelected) color = '#3b82f6'; // 选中：蓝色
+            
+            const scale = isSelected ? 'scale(1.3)' : 'scale(1)';
+            return L.divIcon({
+                className: 'plane-marker',
+                html: `<div style="transform: rotate(${track}deg) ${scale}; color: ${color}; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+                         <i class="fa-solid fa-plane text-2xl"></i>
+                       </div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
             });
-            return icon;
         };
 
-        // Select a new plane
-        const selectPlane = (newPlane) => {
-            // Exit if new plane is not found
-            if (!newPlane) return;
-
-            // Update plane selection
-            const oldPlane = planes[selectedPlane?.hex];
-            selectedPlane = newPlane;
-
-            // Remove highlighting from the previously selected plane
-            oldPlane?.marker.setIcon(getIconForPlane(oldPlane));
-
-            // Update currently selected plane
-            newPlane.marker.setIcon(getIconForPlane(newPlane));
-            updatePlaneInfo(newPlane);
-        };
-
-        // Fetch planes data from the server
         const fetchData = async () => {
             try {
-                const response = await fetch('/data.json');
-                if (!response.ok) return;
+                const response = await fetch('/data.json'); 
                 const data = await response.json();
-                const activePlanes = {};
-                for (const plane of data) {
-                    // Skip planes without valid coordinates
-                    if (plane.lat == null || plane.lon == null) continue;
+                document.getElementById('aircraft-count').innerText = data.length;
 
-                    // Build the plane list from the fetched data
-                    let marker = null;
-                    activePlanes[plane.hex] = true;
-                    plane.flight = plane.flight?.trim() || '';
-                    const existingPlane = planes[plane.hex];
-                    if (existingPlane) {
-                        // Update existing plane marker position
-                        marker = existingPlane.marker;
-                        marker.setLatLng([plane.lat, plane.lon]);
-
-                        // Update existing plane marker icon if track changed significantly
-                        if (existingPlane.track != null && plane.track != null) {
-                            let trackDelta = Math.abs(existingPlane.track - plane.track);
-                            if (trackDelta > 180) trackDelta = 360 - trackDelta;
-                            if (trackDelta > 5) marker.setIcon(getIconForPlane(plane));
+                data.forEach(p => {
+                    if (!p.lat || !p.lon) return;
+                    if (planes[p.hex]) {
+                        planes[p.hex].marker.setLatLng([p.lat, p.lon]);
+                        const oldTrack = planes[p.hex].track;
+                        Object.assign(planes[p.hex], p);
+                        if (Math.abs(oldTrack - p.track) > 1) {
+                            planes[p.hex].marker.setIcon(createIcon(p.track, p.hex === selectedHex));
                         }
-
-                        // Update existing plane properties
-                        existingPlane.altitude = plane.altitude;
-                        existingPlane.speed = plane.speed;
-                        existingPlane.lat = plane.lat;
-                        existingPlane.lon = plane.lon;
-                        existingPlane.track = plane.track;
-                        existingPlane.flight = plane.flight;
-
-                        // Update existing plane info in the panel if it is selected
-                        if (existingPlane.hex === selectedPlane?.hex) {
-                            updatePlaneInfo(existingPlane);
-                        }
+                        if (selectedHex === p.hex) updateUI(p);
                     } else {
-                        // Create a new marker for new planes
-                        const icon = getIconForPlane(plane);
-                        marker = L.marker([plane.lat, plane.lon], { icon: icon }).addTo(map);
-                        plane.marker = marker;
-                        planes[plane.hex] = plane;
-                        marker.on('click', () => selectPlane(planes[plane.hex]));
+                        const marker = L.marker([p.lat, p.lon], { 
+                            icon: createIcon(p.track, false) 
+                        }).addTo(map);
+                        marker.on('click', () => {
+                            const oldSelected = selectedHex;
+                            selectedHex = p.hex;
+                            if (oldSelected && planes[oldSelected]) {
+                                planes[oldSelected].marker.setIcon(createIcon(planes[oldSelected].track, false));
+                            }
+                            marker.setIcon(createIcon(p.track, true));
+                            updateUI(p);
+                        });
+                        planes[p.hex] = { ...p, marker };
                     }
-                }
-
-                // Remove idle planes
-                for (const plane of Object.values(planes)) {
-                    if (!activePlanes[plane.hex]) {
-                        map.removeLayer(plane.marker);
-                        delete planes[plane.hex];
-                        if (selectedPlane?.hex === plane.hex) {
-                            selectedPlane = null;
-                            document.getElementById('planeInfo').innerHTML = 'Click on a plane for info';
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
+                });
+            } catch (e) { console.log("等待数据源..."); }
         };
 
-        // Make info panel draggable
+        // 初始化
+        initMap();
+        setInterval(fetchData, 1000);
+        document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+        // 面板拖拽
         interact('#info-panel').draggable({
             allowFrom: '.info-panel__header',
             listeners: {
-                move: (event) => {
+                move(event) {
                     const target = event.target;
                     const x = (parseFloat(target.dataset.x) || 0) + event.dx;
                     const y = (parseFloat(target.dataset.y) || 0) + event.dy;
@@ -356,33 +263,6 @@
                 }
             }
         });
-
-        // Initialize Leaflet instance
-        const savedView = JSON.parse(localStorage.getItem('mapView'));
-        map = L.map('canvas').setView(
-            savedView ? [savedView.lat, savedView.lng] : [37.0, 13.0],
-            savedView ? savedView.zoom : 8
-        );
-
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(map);
-
-        map.on('moveend', () => {
-            const center = map.getCenter();
-            localStorage.setItem('mapView', JSON.stringify({
-                lat: center.lat,
-                lng: center.lng,
-                zoom: map.getZoom()
-            }));
-        });
-
-        // Setup a timer to poll from the server
-        setInterval(() => {
-            fetchData();
-            updateGeneralInfo();
-        }, 100);
     </script>
 </body>
 
