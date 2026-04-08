@@ -14,4 +14,4 @@ RUN make
 
 EXPOSE 8080
 
-CMD ["./dump1090", "--interactive", "--net", "--quiet"]
+CMD ["./dump1090", "--interactive", "--net"]
