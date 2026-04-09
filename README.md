@@ -17,6 +17,8 @@ Dump1090 是一款专为 RTLSDR 接收机设计的 Mode S 解码器。
 - **坐标计算：** 支持 CPR 坐标解码和基于速度的轨迹计算。
 - **地面位置解码：** 支持对跑道滑行或停靠飞机的定位。
 
+![ADSB.png](https://files.seeusercontent.com/2026/04/09/dCw9/ADSB.png)
+
 ------
 
 ## 编译与安装指南
