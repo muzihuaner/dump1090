@@ -7,8 +7,8 @@
     <title>Dump1090 - 航空雷达</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <script src="https://webapi.amap.com/maps?v=2.0&key=6f025e700cbacbb0bb866712d20bb35c"></script>
 
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -16,9 +16,10 @@
 
     <style>
         body { margin: 0; padding: 0; height: 100dvh; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
-        #canvas { height: 100%; width: 100%; z-index: 1; position: relative; }
+        #canvas { height: 100%; width: 100%; z-index: 1; }
         .plane-icon { transition: transform 500ms linear; display: flex; align-items: center; justify-content: center; }
-        .amap-marker-label { border: none !important; background: transparent !important; }
+        .dark .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7); }
+        .leaflet-control-zoom { border: none !important; margin-left: 16px !important; margin-bottom: 24px !important; }
     </style>
 </head>
 
@@ -63,6 +64,7 @@
         </div>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://gcore.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js"></script>
 
     <script type="module">
@@ -73,27 +75,15 @@
         // 初始化地图
         const init = () => {
             const saved = JSON.parse(localStorage.getItem('mapView'));
-            const center = saved ? [saved.lng, saved.lat] : [121.47, 31.23];
-            const zoom = saved ? saved.zoom : 10;
-
-            // 判断当前是否为夜间模式
-            const isDark = document.documentElement.classList.contains('dark');
-
-            map = new AMap.Map('canvas', {
-                center: center,
-                zoom: zoom,
-                resizeEnable: true,
-                mapStyle: isDark ? 'amap://styles/dark' : 'amap://styles/normal'
-            });
-
-            // 添加缩放控件
-            map.plugin(['AMap.ToolBar'], () => {
-                map.addControl(new AMap.ToolBar());
-            });
+            map = L.map('canvas', { zoomControl: true, attributionControl: false })
+                   .setView(saved ? [saved.lat, saved.lng] : [31.23, 121.47], saved ? saved.zoom : 10);
+            
+            map.zoomControl.setPosition('bottomleft');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
             map.on('moveend', () => {
                 const c = map.getCenter();
-                localStorage.setItem('mapView', JSON.stringify({lat: c.getLat(), lng: c.getLng(), zoom: map.getZoom()}));
+                localStorage.setItem('mapView', JSON.stringify({lat: c.lat, lng: c.lng, zoom: map.getZoom()}));
             });
         };
 
@@ -187,21 +177,16 @@
                 data.forEach(p => {
                     if (p.lat == null) return;
                     activeNow.add(p.hex);
-
+                    
                     if (planes[p.hex]) {
-                        planes[p.hex].marker.setPosition([p.lon, p.lat]);
+                        planes[p.hex].marker.setLatLng([p.lat, p.lon]);
                         const icon = getIcon(p, p.hex === selectedHex);
-                        planes[p.hex].marker.setContent(icon);
+                        planes[p.hex].marker.setIcon(icon);
                         Object.assign(planes[p.hex], p);
                     } else {
-                        const icon = getIcon(p);
-                        const marker = new AMap.Marker({
-                            position: [p.lon, p.lat],
-                            content: icon,
-                            offset: new AMap.Pixel(-15, -15)
-                        });
-                        marker.setMap(map);
-                        marker.on('click', () => {
+                        const marker = L.marker([p.lat, p.lon], { icon: getIcon(p) }).addTo(map);
+                        marker.on('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
                             selectedHex = p.hex;
                             updateDetailPanel(p);
                         });
@@ -212,7 +197,7 @@
 
                 Object.keys(planes).forEach(h => {
                     if (!activeNow.has(h)) {
-                        map.remove(planes[h].marker);
+                        map.removeLayer(planes[h].marker);
                         if(selectedHex === h) {
                             selectedHex = null;
                             document.getElementById('planeInfo').innerHTML = `<div class="py-12 text-center opacity-40 text-sm italic">目标已脱离雷达网</div>`;
@@ -229,13 +214,13 @@
             container.innerHTML = renderPlaneCard(p);
         };
 
-        const getIcon = (p, isSel) => {
-            const div = document.createElement('div');
-            div.className = 'plane-icon';
-            div.style.transform = `rotate(${p.track}deg)`;
-            div.innerHTML = `<i class="fa-solid fa-plane-up ${isSel ? 'text-red-500 scale-125' : 'text-amber-400'} drop-shadow-md" style="font-size: 20px;"></i>`;
-            return div;
-        };
+        const getIcon = (p, isSel) => L.divIcon({
+            className: 'custom-icon',
+            html: `<div class="plane-icon" style="transform: rotate(${p.track}deg)">
+                    <i class="fa-solid fa-plane-up ${isSel ? 'text-red-500 scale-125' : 'text-amber-400'} drop-shadow-md" style="font-size: 20px;"></i>
+                   </div>`,
+            iconSize: [30, 30], iconAnchor: [15, 15]
+        });
 
         window.copyHex = (hex) => {
             navigator.clipboard.writeText(hex).then(() => alert('HEX 已复制: ' + hex));
@@ -258,27 +243,10 @@
 
         // 定位与主题
         document.getElementById('locate-me').onclick = () => {
-            map.plugin('AMap.Geolocation', () => {
-                const geolocation = new AMap.Geolocation({
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
-                geolocation.getCurrentPosition((status, result) => {
-                    if (status === 'complete') {
-                        const {lng, lat} = result.position;
-                        map.setCenter([lng, lat]);
-                        if (userMarker) map.remove(userMarker);
-                        userMarker = new AMap.CircleMarker({
-                            center: [lng, lat],
-                            radius: 8,
-                            fillColor: '#3b82f6',
-                            fillOpacity: 1,
-                            strokeColor: '#fff',
-                            strokeWeight: 2
-                        });
-                        userMarker.setMap(map);
-                    }
-                });
+            map.locate({setView: true, maxZoom: 13});
+            map.on('locationfound', (e) => {
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.circleMarker(e.latlng, {radius: 6, color: '#fff', fillColor: '#3b82f6', fillOpacity: 1, weight: 2}).addTo(map);
             });
         };
 
@@ -286,44 +254,12 @@
             const isDark = document.documentElement.classList.toggle('dark');
             localStorage.theme = isDark ? 'dark' : 'light';
             document.getElementById('theme-icon').className = isDark ? 'fa-solid fa-moon text-yellow-400' : 'fa-solid fa-sun text-orange-500';
-
-            // 切换地图夜间模式
-            if (isDark) {
-                map.setMapStyle('amap://styles/dark');
-            } else {
-                map.setMapStyle('amap://styles/normal');
-            }
         };
 
         if (localStorage.theme === 'light') {
             document.documentElement.classList.remove('dark');
             document.getElementById('theme-icon').className = 'fa-solid fa-sun text-orange-500';
-        } else {
-            document.documentElement.classList.add('dark');
-            document.getElementById('theme-icon').className = 'fa-solid fa-moon text-yellow-400';
         }
-
-        // 使用 MutationObserver 监听地图瓦片变化，动态应用夜间模式滤镜
-        const darkMapFilter = 'brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7)';
-        const mapContainer = document.getElementById('canvas');
-        
-        const applyDarkModeFilter = () => {
-            const isDark = document.documentElement.classList.contains('dark');
-            mapContainer.querySelectorAll('img, canvas').forEach(el => {
-                // 排除飞机图标和标记
-                if (!el.closest('.plane-icon') && !el.closest('.amap-marker') && !el.closest('.amap-overlays')) {
-                    el.style.filter = isDark ? darkMapFilter : 'none';
-                }
-            });
-        };
-
-        const observer = new MutationObserver((mutations) => {
-            applyDarkModeFilter();
-        });
-        observer.observe(mapContainer, { childList: true, subtree: true });
-
-        // 初始应用一次
-        setInterval(applyDarkModeFilter, 500);
 
         interact('#info-panel').draggable({
             allowFrom: '.info-panel__header',
