@@ -41,9 +41,12 @@
         <div class="info-panel__header px-5 py-4 border-b border-slate-200 dark:border-slate-800 cursor-move flex justify-between items-center bg-slate-100/50 dark:bg-slate-800/50">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-tower-observation opacity-50"></i>
-                <h1 class="text-xs font-bold tracking-widest uppercase">ADS-B 实时数据</h1>
+                <h1 class="text-xs font-bold tracking-widest uppercase">ADS-B <br>实时数据</h1>
             </div>
-            <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <div class="flex items-center gap-2">
+                <span id="current-time" class="text-xs font-mono opacity-60"></span>
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            </div>
         </div>
 
         <div class="p-5 space-y-4">
@@ -223,6 +226,21 @@
             navigator.clipboard.writeText(hex).then(() => alert('HEX 已复制: ' + hex));
         };
 
+        // 更新当前时间
+        const updateTime = () => {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            document.getElementById('current-time').textContent = timeStr;
+        };
+
         // 定位与主题
         document.getElementById('locate-me').onclick = () => {
             map.locate({setView: true, maxZoom: 13});
@@ -255,7 +273,9 @@
         });
 
         init();
+        updateTime();
         setInterval(fetchData, 1000);
+        setInterval(updateTime, 1000);
     </script>
 </body>
 </html>
