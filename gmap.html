@@ -87,19 +87,57 @@
         // 获取参数显示 HTML
         const renderPlaneCard = (p) => {
             const flight = p.flight?.trim() || 'N/A';
+            const hex = p.hex;
+            const icaoType = p.icaotype || 'N/A';
+            const registration = p.registration || '';
+            
+            // 构建多渠道查询链接
+            const fr24Link = `https://www.flightradar24.com/${flight}`;
+            const flightAwareLink = `https://flightaware.com/live/modes/${hex.toLowerCase()}/redirect`;
+            const flightStatsLink = `https://www.flightstats.com/go/FlightStatus/flightStatusByFlight.do?flightNumber=${flight}`;
+            const planeFinderLink = `https://planefinder.net/flight/${flight}`;
+            const adsbExchangeLink = `https://globe.adsbexchange.com/?icao=${hex.toLowerCase()}`;
+            
             return `
                 <div class="space-y-4 animate-in fade-in duration-300">
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-[10px] font-bold opacity-50 uppercase tracking-wider">航班呼号 (Flight)</p>
-                            <a href="https://www.flightradar24.com/${flight}" target="_blank" class="text-2xl font-black hover:text-blue-500 dark:hover:text-amber-400 transition-colors flex items-center gap-2">
-                                ${flight} <i class="fa-solid fa-external-link text-[10px]"></i>
-                            </a>
+                            <div class="text-2xl font-black flex items-center gap-2">
+                                ${flight}
+                            </div>
                         </div>
                         <div class="text-right">
                             <p class="text-[10px] font-bold opacity-50 uppercase tracking-wider">十六进制 (HEX)</p>
-                            <span onclick="copyHex('${p.hex}')" class="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded cursor-pointer hover:bg-blue-100 dark:hover:bg-slate-700 transition-colors">${p.hex}</span>
+                            <span onclick="copyHex('${hex}')" class="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded cursor-pointer hover:bg-blue-100 dark:hover:bg-slate-700 transition-colors">${hex}</span>
                         </div>
+                    </div>
+                    
+                    ${registration ? `
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="opacity-50">注册号:</span>
+                        <span class="font-bold">${registration}</span>
+                        ${icaoType !== 'N/A' ? `<span class="opacity-40">|</span><span class="opacity-50">机型:</span><span class="font-bold">${icaoType}</span>` : ''}
+                    </div>
+                    ` : ''}
+                    
+                    <!-- 多渠道查询链接 -->
+                    <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-200 dark:border-slate-700/30">
+                        <a href="${fr24Link}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors">
+                            <i class="fa-solid fa-plane"></i> FlightRadar24
+                        </a>
+                        <a href="${flightAwareLink}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors">
+                            <i class="fa-solid fa-location-arrow"></i> FlightAware
+                        </a>
+                        <a href="${planeFinderLink}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors">
+                            <i class="fa-solid fa-satellite-dish"></i> PlaneFinder
+                        </a>
+                        <a href="${flightStatsLink}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors">
+                            <i class="fa-solid fa-chart-line"></i> FlightStats
+                        </a>
+                        <a href="${adsbExchangeLink}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-md transition-colors">
+                            <i class="fa-solid fa-globe"></i> ADS-B Exchange
+                        </a>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
