@@ -62,7 +62,7 @@ sudo cp dump1090 /usr/local/bin/
 
 # (可选) 如果你想运行 Web 服务，需要保留网页文件
 sudo mkdir -p /usr/share/dump1090
-sudo cp -r public_html /usr/share/dump1090/
+sudo cp gmap.html /usr/share/dump1090/
 ```
 
 #### 方案 B：直接运行
